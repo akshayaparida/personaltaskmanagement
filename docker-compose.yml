@@ -1,17 +1,29 @@
 version: '3.8'
 services:
   db:
-    image: postgres:16
-    container_name: my_postgres
+    image: postgres:latest
+    container_name: personaltaskmanagement
     restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgresps
-      POSTGRES_DB: mydatabase
+      POSTGRES_DB: personaltaskmanagement
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Changed to avoid conflicts with local PostgreSQL
     volumes:
-      - personaltaskmanagement_pgdata:/var/lib/postgresql/data
+      - personaltaskmanagement_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
 
 volumes:
-  personaltaskmanagement_pgdata:
+  personaltaskmanagement_data:
+    driver: local

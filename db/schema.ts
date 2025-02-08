@@ -22,7 +22,7 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(),
   description: text("description"),
   userId: integer("user_id")
-    .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }) // ✅ Correct foreign key usage
+    .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" })
     .notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   deletedAt: timestamp("deleted_at"),
@@ -33,7 +33,7 @@ export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   userId: integer("user_id")
-    .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }) // ✅ Fixed reference issue
+    .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" })
     .notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   deletedAt: timestamp("deleted_at"),
@@ -50,8 +50,19 @@ export const tasks = pgTable("tasks", {
   categoryId: integer("category_id")
     .references(() => categories.id, { onDelete: "cascade", onUpdate: "cascade" }),
   userId: integer("user_id")
-    .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }) // ✅ Fix: Added onUpdate
+    .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" })
     .notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   deletedAt: timestamp("deleted_at"),
+});
+
+// Sessions Table
+export const sessions = pgTable('sessions', {
+  id: serial('id').primaryKey(),
+  token: text('token').notNull(),
+  userId: integer('user_id')
+    .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" })
+    .notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  expiresAt: timestamp('expires_at').notNull()
 });
