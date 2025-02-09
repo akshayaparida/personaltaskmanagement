@@ -1,6 +1,12 @@
 import jwt from 'jsonwebtoken';
+import { cookies } from 'next/headers';
 
 interface TokenPayload {
+  userId: string;
+  email: string;
+}
+
+interface Session {
   userId: string;
   email: string;
 }
@@ -23,48 +29,21 @@ export function verifyToken(token: string): TokenPayload {
   }
 }
 
-// Test the authentication
-async function testAuth() {
-  try {
-    const testPayload = {
-      userId: '123',
-      email: 'test@example.com'
-    };
-    
-    console.log('1. Testing token generation...');
-    const token = generateToken(testPayload);
-    console.log('✓ Token generated successfully:', token);
-
-    console.log('\n2. Testing token verification...');
-    const decoded = verifyToken(token);
-    console.log('✓ Token verified successfully:', decoded);
-
-    console.log('\n3. Testing invalid token...');
-    try {
-      verifyToken('invalid-token');
-      console.log('✗ Should have thrown an error');
-    } catch (error) {
-      console.log('✓ Invalid token correctly rejected');
-    }
-
-    console.log('\n4. Testing token expiration...');
-    const shortLivedToken = jwt.sign(testPayload, process.env.JWT_SECRET ?? 'test-secret-key', { expiresIn: '1s' });
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    try {
-      verifyToken(shortLivedToken);
-      console.log('✗ Should have thrown an error');
-    } catch (error) {
-      console.log('✓ Expired token correctly rejected');
-    }
-
-    console.log('\n✓ All authentication tests passed!');
-  } catch (error) {
-    console.error('\n✗ Authentication test failed:', error);
+export async function getSession(): Promise<Session | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
+  
+  if (!token) {
+    return null;
   }
-}
 
-// Run the test if this file is being run directly
-if (require.main === module) {
-  process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret-key';
-  testAuth();
+  try {
+    const payload = verifyToken(token);
+    return {
+      userId: payload.userId,
+      email: payload.email
+    };
+  } catch {
+    return null;
+  }
 }
