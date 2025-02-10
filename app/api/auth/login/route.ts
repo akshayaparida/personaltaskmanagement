@@ -3,7 +3,7 @@ import { compare } from 'bcryptjs';
 import { db } from '@/lib/drizzle';
 import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { sign } from 'jsonwebtoken';
+import { createToken, setAuthToken } from '@/lib/auth';
 
 export async function POST(req: Request) {
   try {
@@ -11,47 +11,52 @@ export async function POST(req: Request) {
 
     if (!email || !password) {
       return NextResponse.json(
-        { error: 'Email and Password are required.' }, 
+        { error: 'Email and Password are required.' },
         { status: 400 }
       );
     }
 
-    // Use Drizzle query to find user
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.email, email));
+      .where(eq(users.email, email.toLowerCase().trim()));
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Invalid email or password.' }, 
-        { status: 400 }
+        { error: 'Invalid email or password.' },
+        { status: 401 }
       );
     }
 
     const isValid = await compare(password, user.password);
     if (!isValid) {
       return NextResponse.json(
-        { error: 'Invalid email or password.' }, 
-        { status: 400 }
+        { error: 'Invalid email or password.' },
+        { status: 401 }
       );
     }
 
-    // Use JWT secret from environment variable
-    const token = sign(
-      { userId: user.id }, 
-      process.env.JWT_SECRET!, 
-      { expiresIn: '1h' }
-    );
-
-    return NextResponse.json({ 
-      message: 'Login successful.', 
-      token 
+    const token = createToken({
+      userId: user.id.toString(),
+      email: user.email
     });
+
+    const response = NextResponse.json({
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      }
+    });
+
+    await setAuthToken(token);
+
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' }, 
+      { error: 'An unexpected error occurred' },
       { status: 500 }
     );
   }
