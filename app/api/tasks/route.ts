@@ -1,67 +1,76 @@
-import { NextResponse } from "next/server";
-import { db } from "@/lib/drizzle";
-import { tasks } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
-import { getSession } from "@/lib/auth";
+import { NextResponse } from 'next/server'
+import { db } from '@/lib/drizzle'
+import { tasks } from '@/db/schema'
+import { eq, and } from 'drizzle-orm'
+import { getSession } from '@/lib/auth'
 
-export async function GET(req: Request) {
+interface TaskQueryParams {
+  projectId?: string;
+  categoryId?: string;
+}
+
+interface TaskBody {
+  id?: number;
+  title: string;
+  description?: string;
+  isCompleted?: boolean;
+  projectId?: number;
+  categoryId?: number;
+}
+
+export async function GET(request: Request) {
   try {
     const session = await getSession();
-    if (!session?.userId) {
+    if (!session?.user.id) {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    const { searchParams } = new URL(req.url);
-    const categoryId = searchParams.get('categoryId');
-    const projectId = searchParams.get('projectId');
-
-    // Build base query
-    let baseQuery = db
-      .select()
-      .from(tasks);
-
-    // Build conditions array
-    const conditions = [eq(tasks.userId, parseInt(session.userId))];
-
-    if (categoryId) {
-      conditions.push(eq(tasks.categoryId, parseInt(categoryId)));
-    }
+    const { searchParams } = new URL(request.url)
+    const projectId = searchParams.get('projectId')
+    const categoryId = searchParams.get('categoryId')
+    
+    let conditions = [eq(tasks.userId, parseInt(session.user.id))]
 
     if (projectId) {
-      conditions.push(eq(tasks.projectId, parseInt(projectId)));
+      conditions.push(eq(tasks.projectId, parseInt(projectId)))
     }
 
-    // Apply all conditions using and()
-    const userTasks = await baseQuery.where(and(...conditions));
+    if (categoryId) {
+      conditions.push(eq(tasks.categoryId, parseInt(categoryId)))
+    }
+
+    const userTasks = await db.query.tasks.findMany({
+      where: and(...conditions),
+      orderBy: tasks.createdAt
+    })
 
     return NextResponse.json(
       { success: true, data: userTasks },
       { status: 200 }
-    );
-
+    )
   } catch (error) {
-    console.error('Error in GET /api/tasks:', error);
+    console.error('Error fetching tasks:', error)
     return NextResponse.json(
-      { success: false, message: "Internal server error while fetching tasks" },
+      { success: false, message: 'Failed to fetch tasks' },
       { status: 500 }
-    );
+    )
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
     const session = await getSession();
-    if (!session?.userId) {
+    if (!session?.user.id) {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    const body = await req.json();
+    const body: TaskBody = await request.json();
     
     if (!body.title?.trim()) {
       return NextResponse.json(
@@ -70,45 +79,43 @@ export async function POST(req: Request) {
       );
     }
 
-    const taskData = {
+    const newTask = await db.insert(tasks).values({
       title: body.title.trim(),
       description: body.description?.trim(),
-      userId: parseInt(session.userId),
-      categoryId: body.categoryId ? parseInt(body.categoryId) : null,
-      projectId: body.projectId ? parseInt(body.projectId) : null,
-      isCompleted: body.isCompleted || false
-    };
-
-    const newTask = await db
-      .insert(tasks)
-      .values(taskData)
-      .returning();
+      isCompleted: body.isCompleted ?? false,
+      projectId: body.projectId,
+      categoryId: body.categoryId,
+      userId: parseInt(session.user.id)
+    }).returning();
 
     return NextResponse.json(
-      { success: true, data: newTask[0] },
+      { 
+        success: true, 
+        data: newTask[0],
+        message: "Task created successfully" 
+      },
       { status: 201 }
     );
-
   } catch (error) {
-    console.error('Error in POST /api/tasks:', error);
+    console.error('Error creating task:', error)
     return NextResponse.json(
-      { success: false, message: "Internal server error while creating task" },
+      { success: false, message: "Failed to create task" },
       { status: 500 }
     );
   }
 }
 
-export async function PUT(req: Request) {
+export async function PUT(request: Request) {
   try {
     const session = await getSession();
-    if (!session?.userId) {
+    if (!session?.user.id) {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    const body = await req.json();
+    const body: TaskBody = await request.json();
     
     if (!body.id || !body.title?.trim()) {
       return NextResponse.json(
@@ -117,21 +124,18 @@ export async function PUT(req: Request) {
       );
     }
 
-    const taskData = {
-      title: body.title.trim(),
-      description: body.description?.trim(),
-      categoryId: body.categoryId ? parseInt(body.categoryId) : null,
-      projectId: body.projectId ? parseInt(body.projectId) : null,
-      isCompleted: body.isCompleted || false
-    };
-
-    const updatedTask = await db
-      .update(tasks)
-      .set(taskData)
+    const updatedTask = await db.update(tasks)
+      .set({ 
+        title: body.title.trim(),
+        description: body.description?.trim(),
+        isCompleted: body.isCompleted,
+        projectId: body.projectId,
+        categoryId: body.categoryId
+      })
       .where(
         and(
           eq(tasks.id, body.id),
-          eq(tasks.userId, parseInt(session.userId))
+          eq(tasks.userId, parseInt(session.user.id))
         )
       )
       .returning();
@@ -144,30 +148,33 @@ export async function PUT(req: Request) {
     }
 
     return NextResponse.json(
-      { success: true, data: updatedTask[0] },
+      { 
+        success: true, 
+        data: updatedTask[0],
+        message: "Task updated successfully" 
+      },
       { status: 200 }
     );
-
   } catch (error) {
-    console.error('Error in PUT /api/tasks:', error);
+    console.error('Error updating task:', error)
     return NextResponse.json(
-      { success: false, message: "Internal server error while updating task" },
+      { success: false, message: "Failed to update task" },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(request: Request) {
   try {
     const session = await getSession();
-    if (!session?.userId) {
+    if (!session?.user.id) {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    const body = await req.json();
+    const body: TaskBody = await request.json();
     
     if (!body.id) {
       return NextResponse.json(
@@ -176,12 +183,11 @@ export async function DELETE(req: Request) {
       );
     }
 
-    const deletedTask = await db
-      .delete(tasks)
+    const deletedTask = await db.delete(tasks)
       .where(
         and(
           eq(tasks.id, body.id),
-          eq(tasks.userId, parseInt(session.userId))
+          eq(tasks.userId, parseInt(session.user.id))
         )
       )
       .returning();
@@ -194,14 +200,16 @@ export async function DELETE(req: Request) {
     }
 
     return NextResponse.json(
-      { success: true, message: "Task deleted successfully" },
+      { 
+        success: true, 
+        message: "Task deleted successfully" 
+      },
       { status: 200 }
     );
-
   } catch (error) {
-    console.error('Error in DELETE /api/tasks:', error);
+    console.error('Error deleting task:', error)
     return NextResponse.json(
-      { success: false, message: "Internal server error while deleting task" },
+      { success: false, message: "Failed to delete task" },
       { status: 500 }
     );
   }

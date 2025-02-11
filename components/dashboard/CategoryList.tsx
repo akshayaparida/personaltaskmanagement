@@ -1,22 +1,27 @@
-// components/dashboard/CategoryList.tsx
+"use client"
+
+import { useMemo } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useCategoryStore } from '@/store/useCategoryStore'
 import { useTaskStore } from '@/store/useTaskStore'
+import { Category } from '@/types/category'
 
-interface Category {
-  id: string
-  name: string
-  color: string
+interface CategoryListProps {
+  readonly categories?: readonly Category[];
 }
 
-export function CategoryList() {
-  const categories = useCategoryStore((state) => state.categories)
-  const tasks = useTaskStore((state) => state.tasks)
+export function CategoryList({ categories: propCategories }: CategoryListProps) {
+  const storeCategories = useCategoryStore((state) => state.categories);
+  const tasks = useTaskStore((state) => state.tasks);
+
+  const categories = useMemo(() => {
+    return propCategories || storeCategories;
+  }, [propCategories, storeCategories]);
 
   const getCategoryTaskCount = (categoryId: string) => {
-    return tasks.filter(task => task.categoryId === categoryId).length
-  }
+    return tasks.filter(task => task.categoryId === categoryId).length;
+  };
 
   return (
     <Card className="p-6">

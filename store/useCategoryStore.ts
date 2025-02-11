@@ -11,6 +11,7 @@ export interface Category {
 
 interface CategoryStore {
   categories: Category[]
+  setCategories: (categories: Category[]) => void
   addCategory: (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => void
   updateCategory: (id: string, category: Partial<Category>) => void
   deleteCategory: (id: string) => void
@@ -20,6 +21,7 @@ export const useCategoryStore = create<CategoryStore>()(
   persist(
     (set) => ({
       categories: [],
+      setCategories: (categories) => set(() => ({ categories })),
       addCategory: (category) =>
         set((state) => ({
           categories: [

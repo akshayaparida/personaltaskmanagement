@@ -1,229 +1,103 @@
-import { NextResponse } from "next/server";
-import { db } from "@/lib/drizzle";
-import { categories } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
-import { getSession } from "@/lib/auth";
+// app/api/categories/route.ts
+import { NextResponse } from 'next/server'
+import { db } from '@/lib/drizzle'
+import { categories } from '@/db/schema'
+import { eq } from 'drizzle-orm'
 
-// GET: Fetch all categories for authenticated user
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // Get the authentication session
-    const session = await getSession();
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
     
-    // Check if user is authenticated
-    if (!session?.userId) {
+    if (!userId) {
       return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    // Fetch categories for the authenticated user
-    const userCategories = await db
-      .select()
-      .from(categories)
-      .where(eq(categories.userId, parseInt(session.userId)))
-      .orderBy(categories.createdAt);
-
-    return NextResponse.json(
-      { 
-        success: true, 
-        data: userCategories 
-      },
-      { status: 200 }
-    );
-
-  } catch (error) {
-    console.error('Error in GET /api/categories:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: "Internal server error while fetching categories" 
-      },
-      { status: 500 }
-    );
-  }
-}
-
-// POST: Create a new category
-export async function POST(req: Request) {
-  try {
-    // Get the authentication session
-    const session = await getSession();
-    
-    // Check if user is authenticated
-    if (!session?.userId) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    // Parse request body
-    const body = await req.json();
-    
-    // Validate required fields
-    if (!body.name?.trim()) {
-      return NextResponse.json(
-        { success: false, message: "Category name is required" },
+        { success: false, error: 'User ID is required' },
         { status: 400 }
-      );
-    }
-
-    // Create new category
-    const newCategory = await db
-      .insert(categories)
-      .values({
-        name: body.name.trim(),
-        userId: parseInt(session.userId)
-      })
-      .returning();
-
-    return NextResponse.json(
-      { 
-        success: true, 
-        data: newCategory[0],
-        message: "Category created successfully" 
-      },
-      { status: 201 }
-    );
-
-  } catch (error) {
-    console.error('Error in POST /api/categories:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: "Internal server error while creating category" 
-      },
-      { status: 500 }
-    );
-  }
-}
-
-// PUT: Update an existing category
-export async function PUT(req: Request) {
-  try {
-    // Get the authentication session
-    const session = await getSession();
-    
-    // Check if user is authenticated
-    if (!session?.userId) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    // Parse request body
-    const body = await req.json();
-    
-    // Validate required fields
-    if (!body.id || !body.name?.trim()) {
-      return NextResponse.json(
-        { success: false, message: "Category ID and name are required" },
-        { status: 400 }
-      );
-    }
-
-    // Update category
-    const updatedCategory = await db
-      .update(categories)
-      .set({ name: body.name.trim() })
-      .where(
-        and(
-          eq(categories.id, body.id),
-          eq(categories.userId, parseInt(session.userId))
-        )
       )
-      .returning();
-
-    if (!updatedCategory.length) {
-      return NextResponse.json(
-        { success: false, message: "Category not found" },
-        { status: 404 }
-      );
     }
 
-    return NextResponse.json(
-      { 
-        success: true, 
-        data: updatedCategory[0],
-        message: "Category updated successfully" 
-      },
-      { status: 200 }
-    );
+    const userCategories = await db.query.categories.findMany({
+      where: eq(categories.userId, parseInt(userId)),
+      orderBy: categories.createdAt
+    })
 
+    return NextResponse.json({ success: true, data: userCategories })
   } catch (error) {
-    console.error('Error in PUT /api/categories:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        message: "Internal server error while updating category" 
-      },
+      { success: false, error: 'Failed to fetch categories' },
       { status: 500 }
-    );
+    )
   }
 }
 
-// DELETE: Remove a category
-export async function DELETE(req: Request) {
+export async function POST(request: Request) {
   try {
-    // Get the authentication session
-    const session = await getSession();
-    
-    // Check if user is authenticated
-    if (!session?.userId) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    const { name, userId } = await request.json()
 
-    // Parse request body
-    const body = await req.json();
-    
-    // Validate required fields
-    if (!body.id) {
+    if (!name || !userId) {
       return NextResponse.json(
-        { success: false, message: "Category ID is required" },
+        { success: false, error: 'Name and userId are required' },
         { status: 400 }
-      );
-    }
-
-    // Delete category
-    const deletedCategory = await db
-      .delete(categories)
-      .where(
-        and(
-          eq(categories.id, body.id),
-          eq(categories.userId, parseInt(session.userId))
-        )
       )
-      .returning();
-
-    if (!deletedCategory.length) {
-      return NextResponse.json(
-        { success: false, message: "Category not found" },
-        { status: 404 }
-      );
     }
 
-    return NextResponse.json(
-      { 
-        success: true, 
-        message: "Category deleted successfully" 
-      },
-      { status: 200 }
-    );
+    const newCategory = await db.insert(categories).values({
+      name,
+      userId: parseInt(userId)
+    }).returning()
 
+    return NextResponse.json({ success: true, data: newCategory[0] })
   } catch (error) {
-    console.error('Error in DELETE /api/categories:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        message: "Internal server error while deleting category" 
-      },
+      { success: false, error: 'Failed to create category' },
       { status: 500 }
-    );
+    )
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const { id, name } = await request.json()
+
+    if (!id || !name) {
+      return NextResponse.json(
+        { success: false, error: 'Category ID and name are required' },
+        { status: 400 }
+      )
+    }
+
+    const updatedCategory = await db.update(categories)
+      .set({ name })
+      .where(eq(categories.id, id))
+      .returning()
+
+    return NextResponse.json({ success: true, data: updatedCategory[0] })
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Failed to update category' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { id } = await request.json()
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Category ID is required' },
+        { status: 400 }
+      )
+    }
+
+    await db.delete(categories).where(eq(categories.id, id))
+
+    return NextResponse.json({ success: true, message: 'Category deleted successfully' })
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete category' },
+      { status: 500 }
+    )
   }
 }

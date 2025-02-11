@@ -1,18 +1,21 @@
+// components/dashboard/ProjectList.tsx
+"use client"
+
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useProjectStore } from '@/store/useProjectStore'
 import { useTaskStore } from '@/store/useTaskStore'
+import { Project } from '@/types/project'
 
-interface Project {
-  id: string
-  name: string
-  description?: string
-  color: string
+interface ProjectListProps {
+  readonly projects?: readonly Project[];
 }
 
-export function ProjectList() {
-  const projects = useProjectStore((state) => state.projects)
+export function ProjectList({ projects: propProjects }: ProjectListProps) {
+  const storeProjects = useProjectStore((state) => state.projects)
   const tasks = useTaskStore((state) => state.tasks)
+  
+  const projects = propProjects || storeProjects
 
   const getProjectTaskCount = (projectId: string) => {
     return tasks.filter(task => task.projectId === projectId).length
@@ -33,7 +36,7 @@ export function ProjectList() {
             <div className="flex items-center space-x-3">
               <div
                 className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: project.color }}
+                style={{ backgroundColor: project.color ?? '#CBD5E1' }} // Added fallback color
               />
               <span>{project.name}</span>
             </div>

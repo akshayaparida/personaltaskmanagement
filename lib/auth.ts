@@ -4,6 +4,17 @@ import { cookies } from 'next/headers';
 const AUTH_COOKIE_NAME = 'auth_token';
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
 
+interface SessionUser {
+    id: string;
+    email: string;
+    // Add any other user properties you need
+}
+
+interface Session {
+    user: SessionUser;
+    expires: Date;
+}
+
 /**
  * Sets the authentication token as an HTTP-only cookie
  * @param token JWT token to be stored in the cookie
@@ -59,4 +70,21 @@ export function createToken<T extends object>(payload: T): string {
     return jwt.sign(payload, process.env.JWT_SECRET!, {
         expiresIn: COOKIE_MAX_AGE
     });
+}
+
+/**
+ * Gets the current session information from the auth token
+ * @returns Session object containing user information and expiration, or null if no valid session exists
+ */
+export async function getSession(): Promise<Session | null> {
+    const token = await getAuthToken();
+    if (!token) return null;
+
+    const payload = verifyToken<{ user: SessionUser; exp: number }>(token);
+    if (!payload) return null;
+
+    return {
+        user: payload.user,
+        expires: new Date(payload.exp * 1000)
+    };
 }
